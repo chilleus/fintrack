@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FINTRACK">
+<meta name="theme-color" content="#0b1020">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>FINTRACK</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--c:#151c33;--c2:#1d2745;--t:#e8ecf8;--m:#8d98bd;--g:#34d399;--r:#f87171;--b:#6ea8ff;--y:#fbbf24;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--t);font:15px/1.4 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;padding-bottom:84px}
+main{padding:14px;max-width:640px;margin:auto}
+h1{font-size:20px;margin:4px 0 12px}h2{font-size:15px;margin:18px 0 8px;color:var(--m);font-weight:600}
+.card{background:var(--c);border-radius:14px;padding:12px;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.k{color:var(--m);font-size:12px}.v{font-size:19px;font-weight:700;margin-top:2px}
+.g{color:var(--g)}.r{color:var(--r)}.b{color:var(--b)}.y{color:var(--y)}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0e1530;border-top:1px solid var(--c2);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;background:none;border:0;color:var(--m);padding:11px 0;font-size:12px}
+nav button.on{color:var(--b);font-weight:700}
+input,select,button.p,textarea{width:100%;background:var(--c2);color:var(--t);border:1px solid #2b3760;border-radius:10px;padding:11px;font:inherit;margin:4px 0}
+button.p{background:var(--b);color:#08101f;font-weight:700;border:0}button.s{background:var(--c2);color:var(--t);border:0;border-radius:8px;padding:7px 10px;margin:2px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--c2)}
+.row:last-child{border:0}.sm{font-size:12px;color:var(--m)}
+.bar{height:6px;background:var(--c2);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--y)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ov{overflow-x:auto}
+</style></head><body><main id="app"></main>
+<nav id="nav"></nav>
+<script>
+var K='fintrack1',S,tab='ana',dl=null,edit=null,draft=null,msg='';
+var TABS=[['ana','Ana'],['isl','İşlem'],['bor','Borçlar'],['kas','Kasalar'],['rap','Rapor'],['ayr','Ayarlar']];
+var CATS=['Market','Ulaşım','Yemek','Fatura','Kira','Sağlık','Eğlence','Giyim','Diğer'];
+var TYP={card:'Kredi kartı',avans:'Avans/KMH',loan:'Kredi'};
+function seed(){return{n:20,
+debts:[{id:'d1',n:'Garanti BBVA Avans Hesap',t:'avans',bank:'Garanti BBVA',bal:13000,st:13000,lim:0,min:1000,due:''},
+{id:'d2',n:'Garanti BBVA Kredi Kartı',t:'card',bank:'Garanti BBVA',bal:15000,st:15000,lim:0,min:4000,due:''},
+{id:'d3',n:'QNB Kredi Kartı',t:'card',bank:'QNB',bal:24000,st:24000,lim:0,min:5000,due:''},
+{id:'d4',n:'QNB İhtiyaç Kredisi',t:'loan',bank:'QNB',bal:50000,st:50000,lim:0,min:6000,due:''},
+{id:'d5',n:'Akbank Kredi Kartı',t:'card',bank:'Akbank',bal:100000,st:100000,lim:0,min:10000,due:''}],
+vaults:[{id:'v1',n:'Nakit',bal:0},{id:'v2',n:'Banka (kullanılabilir)',bal:0},{id:'v3',n:'Bahşiş birikimi',bal:6266}],
+tx:[],inc:[{n:'Maaş',a:33000},{n:'Yemek desteği',a:7500}],rec:[{n:'Kira',a:15000}],hist:[]}}
+function load(){try{S=JSON.parse(localStorage.getItem(K))}catch(e){}if(!S||!S.debts)S=seed()}
+function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
+function F(n){return(n||0).toLocaleString('tr-TR',{maximumFractionDigits:2})+' ₺'}
+function E(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function find(id){return S.debts.concat(S.vaults).filter(function(x){return x.id==id})[0]}
+function today(){var d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+function apply(t,s){var a=t.a*s,f=find(t.from),o=find(t.to);
+if(t.k=='gelir'&&o)o.bal+=a;
+else if(t.k=='gider'&&f){if(f.id[0]=='v')f.bal-=a;else f.bal+=a}
+else if(t.k=='odeme'){if(f)f.bal-=a;if(o)o.bal-=a}
+else if(t.k=='transfer'){if(f)f.bal-=a;if(o)o.bal+=a}}
+function totD(){return S.debts.reduce(function(s,d){return s+d.bal},0)}
+function totV(){return S.vaults.reduce(function(s,d){return s+d.bal},0)}
+function burden(){return S.debts.reduce(function(s,d){return s+(+d.min||0)},0)+S.rec.reduce(function(s,d){return s+d.a},0)}
+function snap(){var d=today(),h=S.hist,t=totD();if(h.length&&h[h.length-1].d==d)h[h.length-1].t=t;else h.push({d:d,t:t});if(h.length>400)h.shift()}
+function mon(t){return t.d.slice(0,7)}
+function sums(m){var i=0,e=0;S.tx.forEach(function(t){if(mon(t)==m){if(t.k=='gelir')i+=t.a;if(t.k=='gider')e+=t.a}});return[i,e]}
+function opts(arr,sel){return arr.map(function(x){return'<option value="'+x.id+'"'+(x.id==sel?' selected':'')+'>'+E(x.n)+'</option>'}).join('')}
+function render(){
+document.getElementById('nav').innerHTML=TABS.map(function(t){return'<button data-t="'+t[0]+'" class="'+(t[0]==tab?'on':'')+'">'+t[1]+'</button>'}).join('');
+var h='';try{h=V[tab]()}catch(e){h='<div class="card r">Hata: '+E(e.message)+'</div>'}
+document.getElementById('app').innerHTML=(msg?'<div class="card y">'+E(msg)+'</div>':'')+h;msg=''}
+var V={
+ana:function(){var m=today().slice(0,7),s=sums(m),inc=S.inc.reduce(function(a,b){return a+b.a},0);
+return'<h1>FINTRACK</h1><div class="grid"><div class="card"><div class="k">Toplam borç</div><div class="v r">'+F(totD())+'</div></div><div class="card"><div class="k">Toplam varlık</div><div class="v g">'+F(totV())+'</div></div><div class="card"><div class="k">Net durum</div><div class="v '+(totV()-totD()<0?'r':'g')+'">'+F(totV()-totD())+'</div></div><div class="card"><div class="k">Aylık ödeme yükü</div><div class="v y">'+F(burden())+'</div></div></div>'+
+'<h2>Bu ay</h2><div class="grid"><div class="card"><div class="k">Gelir (işlenen)</div><div class="v g">'+F(s[0])+'</div></div><div class="card"><div class="k">Gider (işlenen)</div><div class="v r">'+F(s[1])+'</div></div></div><div class="card sm">Tanımlı aylık gelir: <b>'+F(inc)+'</b> · Yük sonrası kalan: <b>'+F(inc-burden())+'</b></div>'+
+'<h2>Borçlar</h2><div class="card">'+S.debts.map(function(d){var p=d.st?Math.max(0,100-d.bal/d.st*100):0;return'<div class="row"><div><div>'+E(d.n)+'</div><div class="sm">Asgari '+F(d.min)+'</div><div class="bar" style="width:120px"><i style="width:'+p+'%"></i></div></div><b class="r">'+F(d.bal)+'</b></div>'}).join('')+'</div>'},
+isl:function(){var x=draft||edit||{k:'gider',d:today(),a:'',desc:'',cat:'Market',from:'v1',to:'d1'},k=x.k;
+var src=k=='gider'?S.vaults.concat(S.debts.filter(function(d){return d.t!='loan'})):S.vaults;
+var dst=k=='odeme'?S.debts:S.vaults;
+var f='<div class="card"><b>'+(edit?'İşlemi düzelt':'Yeni işlem')+'</b><select id="k"><option value="gider"'+(k=='gider'?' selected':'')+'>Gider</option><option value="gelir"'+(k=='gelir'?' selected':'')+'>Gelir</option><option value="odeme"'+(k=='odeme'?' selected':'')+'>Borç ödemesi</option><option value="transfer"'+(k=='transfer'?' selected':'')+'>Kasalar arası aktarım</option></select>'+
+'<div class="two"><input id="a" type="number" step="0.01" inputmode="decimal" placeholder="Tutar" value="'+E(x.a)+'"><input id="d" type="date" value="'+x.d+'"></div>'+
+(k!='gelir'?'<div class="k">'+(k=='gider'?'Ödeme kaynağı (kart seçersen o kartın borcu artar)':'Çıkış kasası')+'</div><select id="from">'+opts(src,x.from)+'</select>':'')+
+(k!='gider'?'<div class="k">'+(k=='odeme'?'Ödenen borç':'Giriş kasası')+'</div><select id="to">'+opts(dst,x.to)+'</select>':'')+
+(k=='gider'?'<select id="cat">'+CATS.map(function(c){return'<option'+(c==x.cat?' selected':'')+'>'+c+'</option>'}).join('')+'</select>':'')+
+'<input id="desc" placeholder="Açıklama" value="'+E(x.desc)+'"><button class="p" data-a="add">'+(edit?'Güncelle':'Kaydet')+'</button>'+(edit?'<button class="s" data-a="cancel">Vazgeç</button>':'')+'</div>';
+var l=S.tx.slice().reverse().slice(0,80).map(function(t){var n=(find(t.from)||{}).n,o=(find(t.to)||{}).n,sg=t.k=='gelir'?'g':(t.k=='gider'?'r':'b');
+return'<div class="row"><div><div>'+E(t.desc||t.cat||t.k)+'</div><div class="sm">'+t.d+' · '+t.k+(t.cat&&t.k=='gider'?' · '+t.cat:'')+' · '+E(n||'')+(n&&o?' → ':'')+E(o||'')+'</div></div><div style="text-align:right"><b class="'+sg+'">'+F(t.a)+'</b><div><button class="s" data-a="ed" data-i="'+t.id+'">Düzelt</button><button class="s" data-a="del" data-i="'+t.id+'">Sil</button></div></div></div>'}).join('')||'<div class="sm">Henüz işlem yok.</div>';
+return'<h1>İşlemler</h1>'+f+'<h2>Geçmiş</h2><div class="card">'+l+'</div>'},
+bor:function(){return'<h1>Borçlar</h1>'+S.debts.map(function(d){return'<div class="card"><div class="row"><b>'+E(d.n)+'</b><span class="sm">'+TYP[d.t]+'</span></div><div class="two"><div><div class="k">Güncel borç</div><input data-f="bal" data-i="'+d.id+'" type="number" value="'+d.bal+'"></div><div><div class="k">Başlangıç</div><input data-f="st" data-i="'+d.id+'" type="number" value="'+d.st+'"></div><div><div class="k">Limit</div><input data-f="lim" data-i="'+d.id+'" type="number" value="'+d.lim+'"></div><div><div class="k">Asgari ödeme</div><input data-f="min" data-i="'+d.id+'" type="number" value="'+d.min+'"></div></div><div class="k">Son ödeme tarihi</div><input data-f="due" data-i="'+d.id+'" type="date" value="'+d.due+'">'+
+(d.lim?'<div class="sm">Kullanılabilir limit: '+F(d.lim-d.bal)+'</div>':'')+'<div class="sm">Yapılan ödemeler: '+F(S.tx.filter(function(t){return t.k=='odeme'&&t.to==d.id}).reduce(function(a,t){return a+t.a},0))+'</div></div>'}).join('')+'<div class="sm">Öncelik: faiz/avans ve en yüksek faizli borç önce; asgari ödemeleri aksatma.</div>'},
+kas:function(){return'<h1>Kasalar</h1>'+S.vaults.map(function(v){return'<div class="card row"><b>'+E(v.n)+'</b><span class="v g">'+F(v.bal)+'</span></div>'}).join('')+'<div class="sm">Aktarım için İşlem sekmesinden “Kasalar arası aktarım” seç.</div>'},
+rap:function(){var ms=[],d=new Date();for(var i=5;i>=0;i--){var x=new Date(d.getFullYear(),d.getMonth()-i,1);ms.push(x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2))}
+var data=ms.map(sums),mx=Math.max(1,Math.max.apply(0,data.map(function(a){return Math.max(a[0],a[1])}))),bars='';
+data.forEach(function(a,i){var x=i*50+10;bars+='<rect x="'+x+'" y="'+(100-a[0]/mx*90)+'" width="16" height="'+a[0]/mx*90+'" fill="#34d399"/><rect x="'+(x+18)+'" y="'+(100-a[1]/mx*90)+'" width="16" height="'+a[1]/mx*90+'" fill="#f87171"/><text x="'+(x+3)+'" y="114" fill="#8d98bd" font-size="9">'+ms[i].slice(5)+'</text>'});
+var h=S.hist,line='<div class="sm">Grafik için en az iki gün işlem gerekir.</div>';
+if(h.length>1){var hm=Math.max.apply(0,h.map(function(p){return p.t})),hn=Math.min.apply(0,h.map(function(p){return p.t})),rg=Math.max(1,hm-hn);line='<svg viewBox="0 0 300 90"><polyline fill="none" stroke="#6ea8ff" stroke-width="2" points="'+h.map(function(p,i){return(i/(h.length-1)*290+5)+','+(80-(p.t-hn)/rg*70)}).join(' ')+'"/></svg><div class="sm">'+F(hn)+' – '+F(hm)+'</div>'}
+var m=today().slice(0,7),cat={};S.tx.forEach(function(t){if(t.k=='gider'&&mon(t)==m)cat[t.cat||'Diğer']=(cat[t.cat||'Diğer']||0)+t.a});
+return'<h1>Rapor</h1><div class="card"><b>Aylık gelir (yeşil) / gider (kırmızı)</b><svg viewBox="0 0 300 120">'+bars+'</svg></div><div class="card"><b>Toplam borç değişimi</b>'+line+'</div><div class="card"><b>Bu ay kategoriler</b>'+(Object.keys(cat).map(function(c){return'<div class="row"><span>'+c+'</span><b>'+F(cat[c])+'</b></div>'}).join('')||'<div class="sm">Gider yok.</div>')+'</div>'},
+ayr:function(){return'<h1>Ayarlar</h1><div class="card"><b>Aylık gelir tanımları</b>'+S.inc.map(function(x,i){return'<div class="row"><span>'+E(x.n)+'</span><span>'+F(x.a)+' <button class="s" data-a="ri" data-i="'+i+'">Sil</button></span></div>'}).join('')+'<b style="display:block;margin-top:10px">Sabit giderler</b>'+S.rec.map(function(x,i){return'<div class="row"><span>'+E(x.n)+'</span><span>'+F(x.a)+' <button class="s" data-a="rr" data-i="'+i+'">Sil</button></span></div>'}).join('')+
+'<div class="two"><input id="rn" placeholder="Ad"><input id="ra" type="number" placeholder="Tutar"></div><div class="two"><button class="s" data-a="addinc">Gelir ekle</button><button class="s" data-a="addrec">Sabit gider ekle</button></div><div class="sm">QNB kredi taksiti (6.000 ₺) ve diğer asgari ödemeler Borçlar sekmesindeki “Asgari ödeme”den yüke eklenir; burada tekrar ekleme.</div></div>'+
+'<div class="card"><b>Yeni borç / kasa</b><input id="nn" placeholder="Ad"><div class="two"><select id="nt"><option value="card">Kredi kartı</option><option value="avans">Avans/KMH</option><option value="loan">Kredi</option><option value="vault">Kasa</option></select><input id="na" type="number" placeholder="Tutar"></div><button class="s" data-a="addnew">Ekle</button></div>'+
+'<div class="card"><b>Yedek</b><button class="p" data-a="bk">JSON yedeği indir</button><button class="p" data-a="csv">CSV dışa aktar</button><button class="s" data-a="cp">JSON’u panoya kopyala</button><textarea id="rs" rows="3" placeholder="Geri yüklemek için JSON yedeğini buraya yapıştır"></textarea><button class="p" data-a="rest">Geri yükle</button><button class="s r" data-a="reset">Tüm verileri sıfırla</button><div class="sm">Veriler yalnızca bu cihazın tarayıcı deposunda durur, hiçbir yere gönderilmez. Safari verilerini silersen kaybolur; düzenli yedek al.</div></div>'}};
+function v(id){var e=document.getElementById(id);return e?e.value:''}
+function saveFile(name,data){try{var u=URL.createObjectURL(new Blob([data],{type:'application/octet-stream'})),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000)}catch(e){msg='İndirilemedi; “panoya kopyala”yı kullan.';render()}}
+var A={
+add:function(){var k=v('k'),a=parseFloat(v('a'));if(!(a>0)){msg='Geçerli tutar gir.';return render()}
+var t={id:'t'+(S.n++),k:k,a:a,d:v('d')||today(),desc:v('desc'),cat:k=='gider'?v('cat'):'',from:k=='gelir'?'':v('from'),to:k=='gider'?'':v('to')};
+if(k=='transfer'&&t.from==t.to){msg='Kasalar farklı olmalı.';return render()}
+if(edit){var i=S.tx.findIndex(function(x){return x.id==edit.id});if(i>-1)S.tx[i]=t;else S.tx.push(t)}else S.tx.push(t);
+S.tx.sort(function(x,y){return x.d<y.d?-1:x.d>y.d?1:0});apply(t,1);edit=null;draft=null;snap();save();msg='Kaydedildi.';render()},
+cancel:function(){if(edit){S.tx.push(edit);S.tx.sort(function(x,y){return x.d<y.d?-1:x.d>y.d?1:0});apply(edit,1);save()}edit=null;draft=null;render()},
+ed:function(e){var i=S.tx.findIndex(function(x){return x.id==e.i});if(i<0)return;var t=S.tx[i];apply(t,-1);S.tx.splice(i,1);edit=t;draft=null;snap();save();render()},
+del:function(e){var i=S.tx.findIndex(function(x){return x.id==e.i});if(i<0||!confirm('Bu işlem silinsin mi? Bakiyeler geri alınır.'))return;apply(S.tx[i],-1);S.tx.splice(i,1);snap();save();render()},
+ri:function(e){S.inc.splice(e.i,1);save();render()},rr:function(e){S.rec.splice(e.i,1);save();render()},
+addinc:function(){var a=parseFloat(v('ra'));if(v('rn')&&a>0){S.inc.push({n:v('rn'),a:a});save()}render()},
+addrec:function(){var a=parseFloat(v('ra'));if(v('rn')&&a>0){S.rec.push({n:v('rn'),a:a});save()}render()},
+addnew:function(){var n=v('nn'),a=parseFloat(v('na'))||0,t=v('nt');if(!n)return;if(t=='vault')S.vaults.push({id:'v'+(S.n++),n:n,bal:a});else S.debts.push({id:'d'+(S.n++),n:n,t:t,bank:'',bal:a,st:a,lim:0,min:0,due:''});snap();save();render()},
+bk:function(){saveFile('fintrack-yedek-'+today()+'.json',JSON.stringify(S))},
+cp:function(){var s=JSON.stringify(S);try{navigator.clipboard.writeText(s).then(function(){msg='Panoya kopyalandı.';render()},function(){msg='Kopyalanamadı.';render()})}catch(e){msg='Kopyalanamadı.';render()}},
+csv:function(){var r=['tarih,tur,tutar,aciklama,kategori,kaynak,hedef'].concat(S.tx.map(function(t){return[t.d,t.k,t.a,'"'+(t.desc||'').replace(/"/g,'""')+'"',t.cat,(find(t.from)||{}).n||'',(find(t.to)||{}).n||''].join(',')}));saveFile('fintrack-islemler.csv','\ufeff'+r.join('\n'))},
+rest:function(){try{var o=JSON.parse(v('rs'));if(!o.debts||!o.vaults)throw 0;if(!confirm('Mevcut veriler yedekle değiştirilsin mi?'))return;S=o;save();msg='Geri yüklendi.'}catch(e){msg='Geçersiz yedek.'}render()},
+reset:function(){if(confirm('Tüm veriler silinsin mi?')){S=seed();save();render()}}};
+document.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;if(b.dataset.t){tab=b.dataset.t;render();window.scrollTo(0,0)}else if(b.dataset.a&&A[b.dataset.a])A[b.dataset.a](b.dataset)});
+document.addEventListener('change',function(e){var t=e.target;if(t.id=='k'&&tab=='isl'){draft={k:t.value,d:v('d'),a:v('a'),desc:v('desc'),cat:'Market',from:'v1',to:t.value=='odeme'?'d1':'v2'};if(edit){draft.id=edit.id}render();return}
+if(t.dataset.f){var d=find(t.dataset.i);if(d){var n=t.dataset.f=='due'?t.value:(parseFloat(t.value)||0);d[t.dataset.f]=n;snap();save()}}});
+load();render();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
+</script></body></html>
